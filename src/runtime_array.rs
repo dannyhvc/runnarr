@@ -1,73 +1,286 @@
 use std::{
-    alloc::{alloc, Layout},
+    alloc::{alloc, alloc_zeroed, Layout},
     mem,
     ops::{Index, IndexMut},
+    ptr,
 };
+
+use crate::error::BaseError;
 
 #[derive(Debug, Clone, Hash)]
 pub struct Array<T> {
     cap: usize,
-    size: usize,
+    len: usize,
     ptr: *mut T,
 }
 
 impl<T> Array<T> {
-    pub fn new(size: usize) -> Self {
+    /// Creates a new `Array` with the specified size.
+    ///
+    /// # Parameters
+    ///
+    /// - `size`: The size of the array, representing both its capacity and initial length.
+    ///
+    /// # Returns
+    ///
+    /// Returns a new `Array` with the given size. The array is uninitialized, and its elements
+    /// may contain arbitrary values. It is the responsibility of the user to properly initialize
+    /// the array elements before use.
+    ///
+    /// # Panics
+    ///
+    /// Panics if memory allocation fails.
+    ///
+    /// # Safety
+    ///
+    /// This method uses unsafe Rust constructs for memory allocation and pointer manipulation.
+    /// The returned `Array` is uninitialized, and it is the user's responsibility to ensure
+    /// proper initialization of the array elements before use.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use runtarr::runtime_array::Array;
+    ///
+    /// // Create a new Array with size 5 (uninitialized).
+    /// let array: Array<i32> = Array::new(5);
+    ///
+    /// // Initialize the array elements before use.
+    /// for i in 0..5 {
+    ///     unsafe {
+    ///         (*array.ptr.add(i)) = i * 2;
+    ///     }
+    /// }
+    /// ```
+    pub fn new(size: usize) -> Result<Self, BaseError> {
         let ptr: *mut T;
-
-        // Layout array of T should give the propper alignment and sizing for the alloc
-        let layout = Layout::array::<T>(size)
-            .expect("Unable to create memory layout for Array::new");
+        let layout = Layout::array::<T>(size)?;
 
         unsafe {
             ptr = alloc(layout) as *mut T;
         }
 
         if ptr.is_null() {
-            panic!("Failed to allocate memory for [Array:ptr]");
+            return Err(BaseError(
+                "Layout or memory allocation failed".to_string(),
+            ));
         }
 
-        Self {
+        Ok(Self {
             cap: size,
-            size,
+            len: size,
             ptr,
-        }
+        })
     }
 
+    /// Creates a new `Array` with the specified size, initializing all elements to zero.
+    ///
+    /// # Parameters
+    ///
+    /// - `size`: The size of the array, representing both its capacity and initial length.
+    ///
+    /// # Returns
+    ///
+    /// Returns a new `Array` with the given size. All elements are initialized to zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics if memory allocation fails.
+    ///
+    /// # Safety
+    ///
+    /// This method uses unsafe Rust constructs for memory allocation and pointer manipulation.
+    /// It ensures that the memory is properly initialized to zero, but incorrect usage of the
+    /// returned `Array` may lead to undefined behavior.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use runtarr::runtime_array::Array;
+    ///
+    /// // Create a new Array with size 5, initializing all elements to zero.
+    /// let array: Array<i32> = Array::zeroed(5);
+    /// ```
+    pub fn zeroed(size: usize) -> Result<Self, BaseError> {
+        let ptr: *mut T;
+        let layout = Layout::array::<T>(size)?;
+
+        unsafe {
+            ptr = alloc_zeroed(layout) as *mut T;
+        }
+
+        if ptr.is_null() {
+            return Err(BaseError(
+                "Layout or memory allocation failed for zeroed array"
+                    .to_string(),
+            ));
+        }
+
+        Ok(Self {
+            cap: size,
+            len: size,
+            ptr,
+        })
+    }
+
+    /// Returns the length of the array.
+    ///
+    /// # Returns
+    ///
+    /// Returns the length of the array, representing the number of elements it currently contains.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use runtarr::runtime_array::Array;
+    ///
+    /// let array: Array<i32> = /* initialize array */;
+    /// let length = array.len();
+    /// println!("Array length: {}", length);
+    /// ```
     #[inline(always)]
     pub const fn len(&self) -> usize {
-        self.size
+        self.len
     }
 
+    /// Returns the capacity of the array.
+    ///
+    /// # Returns
+    ///
+    /// Returns the capacity of the array, representing the maximum number of elements it can hold
+    /// without resizing.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use runtarr::runtime_array::Array;
+    ///
+    /// let array: Array<i32> = /* initialize array */;
+    /// let capacity = array.cap();
+    /// println!("Array capacity: {}", capacity);
+    /// ```
     #[inline(always)]
     pub const fn cap(&self) -> usize {
         self.cap
     }
 
+    /// Returns a raw pointer to the start of the array.
+    ///
+    /// # Returns
+    ///
+    /// Returns a raw pointer to the first element of the array.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use runtarr::runtime_array::Array;
+    ///
+    /// let array: Array<i32> = /* initialize array */;
+    /// let ptr = array.ptr();
+    /// // Use the pointer as needed, with proper safety precautions.
+    /// ```
     #[inline(always)]
     pub const fn ptr(&self) -> *const T {
         self.ptr
     }
 
     #[inline(always)]
-    pub fn get(&self, index: usize) -> &T {
-        if index >= self.size {
-            panic!("index out of bounds");
-        }
-        unsafe { &*self.ptr.add(index) }
+    pub fn ptr_mut(&self) -> *mut T {
+        self.ptr as *mut T
     }
-
+    /// Gets a reference to the element at the specified index.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: The index of the element to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// Returns a reference to the element at the specified index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds.
+    ///
+    /// # Safety
+    ///
+    /// This method uses unsafe Rust constructs for pointer manipulation. It ensures that the
+    /// index is within bounds before returning a reference to the element.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use runtarr::runtime_array::Array;
+    ///
+    /// let array: Array<i32> = /* initialize array */;
+    /// let element = array.get(2);
+    /// println!("Element at index 2: {}", element);
+    /// ```
     #[inline(always)]
-    pub fn get_mut(&mut self, index: usize) -> &mut T {
-        if index >= self.size {
-            panic!("index out of bounds");
+    pub fn get(&self, index: usize) -> Option<&T> {
+        if index >= self.len {
+            return None;
         }
-        unsafe { &mut *self.ptr.add(index) }
+        Some(unsafe { &*self.ptr.add(index) })
     }
 
-    pub(crate) fn deallocate(&mut self) {
+    /// Gets a mutable reference to the element at the specified index.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: The index of the element to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// Returns a mutable reference to the element at the specified index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds.
+    ///
+    /// # Safety
+    ///
+    /// This method uses unsafe Rust constructs for pointer manipulation. It ensures that the
+    /// index is within bounds before returning a mutable reference to the element.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use runtarr::runtime_array::Array;
+    ///
+    /// let mut array: Array<i32> = /* initialize array */;
+    /// let element = array.get_mut(2);
+    /// *element = 42; // Modify the element at index 2.
+    /// ```
+    #[inline(always)]
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+        if index >= self.len {
+            return None;
+        }
+        Some(unsafe { &mut *self.ptr.add(index) })
+    }
+
+    /// Deallocates the memory used by the array.
+    ///
+    /// This method should be used when the array is no longer needed to prevent memory leaks.
+    ///
+    /// # Safety
+    ///
+    /// This method uses unsafe Rust constructs for deallocating memory. It assumes that the
+    /// memory was properly allocated by the same instance of the `Array` and that it is not
+    /// used or accessed after deallocation.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use runtarr::runtime_array::Array;
+    ///
+    /// let mut array: Array<i32> = /* initialize array */;
+    /// array.deallocate();
+    /// ```
+    fn deallocate(&mut self) {
         let layout =
-            Layout::array::<T>(self.size).expect("Failed to create layout");
+            Layout::array::<T>(self.len).expect("Failed to create exit layout");
         unsafe {
             std::alloc::dealloc(self.ptr as *mut u8, layout);
         }
@@ -83,13 +296,13 @@ impl<T> Drop for Array<T> {
 impl<T> Index<usize> for Array<T> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
-        self.get(index)
+        self.get(index).expect("Index out of bounds")
     }
 }
 
 impl<T> IndexMut<usize> for Array<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.get_mut(index)
+        self.get_mut(index).expect("Index out of bounds")
     }
 }
 
@@ -103,6 +316,7 @@ impl<T> Iterator for ArrayIntoIter<T> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         if self.start == self.end {
+            // reached the end of the array
             None
         } else {
             let result: T;
@@ -127,7 +341,7 @@ impl<T> IntoIterator for Array<T> {
     fn into_iter(self) -> Self::IntoIter {
         Self::IntoIter {
             start: self.ptr,
-            end: unsafe { self.ptr.add(self.size) },
+            end: unsafe { self.ptr.add(self.len) },
         }
     }
 }
@@ -137,7 +351,7 @@ impl<T> FromIterator<T> for Array<T> {
         let iter = iter.into_iter();
         let size_hint = iter.size_hint().0;
 
-        let mut array = Array::new(size_hint);
+        let mut array = Array::new(size_hint).expect(""); //TODO come up with meaningful error message
 
         for (index, item) in iter.enumerate() {
             if index >= size_hint {
@@ -146,10 +360,27 @@ impl<T> FromIterator<T> for Array<T> {
             array[index] = item;
         }
 
-        if size_hint != array.size {
+        if size_hint != array.len {
             panic!("Iterator produced a different number of elements than the allocated size");
         }
 
         array
+    }
+}
+
+impl<T> From<&[T]> for Array<T> {
+    fn from(slice: &[T]) -> Self {
+        let copy_to_array = Array::new(slice.len()).unwrap();
+
+        // Manually copy elements from the slice to the allocated memory.
+        unsafe {
+            ptr::copy_nonoverlapping(
+                slice.as_ptr(),
+                copy_to_array.ptr() as *mut T,
+                slice.len(),
+            );
+        }
+
+        copy_to_array
     }
 }
