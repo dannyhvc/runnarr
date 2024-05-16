@@ -1,5 +1,4 @@
 use std::{
-    alloc::{alloc, alloc_zeroed, Layout},
     mem,
     ops::{Index, IndexMut},
     ptr,
@@ -7,14 +6,15 @@ use std::{
 
 use crate::error::BaseError;
 
+type X<T: Default> = ArrayCStyle<T>;
+
 #[derive(Debug, Clone, Hash)]
-pub struct Array<T> {
-    cap: usize,
+pub struct ArrayCStyle<T> {
     len: usize,
     ptr: *mut T,
 }
 
-impl<T> Array<T> {
+impl<T> ArrayCStyle<T> {
     /// Creates a new `Array` with the specified size.
     ///
     /// # Parameters
@@ -39,8 +39,8 @@ impl<T> Array<T> {
     ///
     /// # Example
     ///
-    /// ```rust
-    /// use runtarr::runtime_array::Array;
+    /// ```rust ignore
+    /// use runnarr::runtime_array::ArrayCStyle;
     ///
     /// // Create a new Array with size 5 (uninitialized).
     /// let array: Array<i32> = Array::new(5);
@@ -54,10 +54,10 @@ impl<T> Array<T> {
     /// ```
     pub fn new(size: usize) -> Result<Self, BaseError> {
         let ptr: *mut T;
-        let layout = Layout::array::<T>(size)?;
+        let layout = std::alloc::Layout::array::<T>(size)?;
 
         unsafe {
-            ptr = alloc(layout) as *mut T;
+            ptr = std::alloc::alloc(layout) as *mut T;
         }
 
         if ptr.is_null() {
@@ -66,11 +66,7 @@ impl<T> Array<T> {
             ));
         }
 
-        Ok(Self {
-            cap: size,
-            len: size,
-            ptr,
-        })
+        Ok(Self { len: size, ptr })
     }
 
     /// Creates a new `Array` with the specified size, initializing all elements to zero.
@@ -95,18 +91,18 @@ impl<T> Array<T> {
     ///
     /// # Example
     ///
-    /// ```rust
-    /// use runtarr::runtime_array::Array;
+    /// ```rust ignore
+    /// use runnarr::runtime_array::ArrayCStyle;
     ///
     /// // Create a new Array with size 5, initializing all elements to zero.
     /// let array: Array<i32> = Array::zeroed(5);
     /// ```
     pub fn zeroed(size: usize) -> Result<Self, BaseError> {
         let ptr: *mut T;
-        let layout = Layout::array::<T>(size)?;
+        let layout = std::alloc::Layout::array::<T>(size)?;
 
         unsafe {
-            ptr = alloc_zeroed(layout) as *mut T;
+            ptr = std::alloc::alloc_zeroed(layout) as *mut T;
         }
 
         if ptr.is_null() {
@@ -116,11 +112,7 @@ impl<T> Array<T> {
             ));
         }
 
-        Ok(Self {
-            cap: size,
-            len: size,
-            ptr,
-        })
+        Ok(Self { len: size, ptr })
     }
 
     /// Returns the length of the array.
@@ -131,37 +123,16 @@ impl<T> Array<T> {
     ///
     /// # Example
     ///
-    /// ```rust
-    /// use runtarr::runtime_array::Array;
+    /// ```rust ignore
+    /// use runnarr::runtime_array::ArrayCStyle;
     ///
-    /// let array: Array<i32> = /* initialize array */;
+    /// let array: Array<i32> = Array::new(10); /* initialize array */;
     /// let length = array.len();
     /// println!("Array length: {}", length);
     /// ```
     #[inline(always)]
     pub const fn len(&self) -> usize {
         self.len
-    }
-
-    /// Returns the capacity of the array.
-    ///
-    /// # Returns
-    ///
-    /// Returns the capacity of the array, representing the maximum number of elements it can hold
-    /// without resizing.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use runtarr::runtime_array::Array;
-    ///
-    /// let array: Array<i32> = /* initialize array */;
-    /// let capacity = array.cap();
-    /// println!("Array capacity: {}", capacity);
-    /// ```
-    #[inline(always)]
-    pub const fn cap(&self) -> usize {
-        self.cap
     }
 
     /// Returns a raw pointer to the start of the array.
@@ -172,10 +143,10 @@ impl<T> Array<T> {
     ///
     /// # Example
     ///
-    /// ```rust
-    /// use runtarr::runtime_array::Array;
+    /// ```rust ignore
+    /// use runnarr::runtime_array::ArrayCStyle;
     ///
-    /// let array: Array<i32> = /* initialize array */;
+    /// let array: Array<i32> = Array::new(10); /* initialize array */;
     /// let ptr = array.ptr();
     /// // Use the pointer as needed, with proper safety precautions.
     /// ```
@@ -204,15 +175,14 @@ impl<T> Array<T> {
     ///
     /// # Safety
     ///
-    /// This method uses unsafe Rust constructs for pointer manipulation. It ensures that the
-    /// index is within bounds before returning a reference to the element.
+    /// Caution: The space for the type is allocated but the type itself may not be allocated.
     ///
     /// # Example
     ///
-    /// ```rust
-    /// use runtarr::runtime_array::Array;
+    /// ```rust ignore
+    /// use runnarr::runtime_array::ArrayCStyle;
     ///
-    /// let array: Array<i32> = /* initialize array */;
+    /// let array: Array<i32> = Array::new(10); /* initialize array */;
     /// let element = array.get(2);
     /// println!("Element at index 2: {}", element);
     /// ```
@@ -240,15 +210,14 @@ impl<T> Array<T> {
     ///
     /// # Safety
     ///
-    /// This method uses unsafe Rust constructs for pointer manipulation. It ensures that the
-    /// index is within bounds before returning a mutable reference to the element.
+    /// Caution: The space for the type is allocated but the type itself may not be allocated.
     ///
     /// # Example
     ///
-    /// ```rust
-    /// use runtarr::runtime_array::Array;
+    /// ```rust ignore
+    /// use runnarr::runtime_array::ArrayCStyle;
     ///
-    /// let mut array: Array<i32> = /* initialize array */;
+    /// let array: Array<i32> = Array::new(10); /* initialize array */;
     /// let element = array.get_mut(2);
     /// *element = 42; // Modify the element at index 2.
     /// ```
@@ -272,35 +241,35 @@ impl<T> Array<T> {
     ///
     /// # Example
     ///
-    /// ```rust
-    /// use runtarr::runtime_array::Array;
+    /// ```rust ignore
+    /// use runnarr::runtime_array::ArrayCStyle;
     ///
-    /// let mut array: Array<i32> = /* initialize array */;
-    /// array.deallocate();
+    /// let array: Array<i32> = Array::new(10).unwrap(); /* initialize array */;
+    /// //array.deallocate();
     /// ```
     fn deallocate(&mut self) {
-        let layout =
-            Layout::array::<T>(self.len).expect("Failed to create exit layout");
+        let layout = std::alloc::Layout::array::<T>(self.len)
+            .expect("Failed to create exit layout");
         unsafe {
             std::alloc::dealloc(self.ptr as *mut u8, layout);
         }
     }
 }
 
-impl<T> Drop for Array<T> {
+impl<T> Drop for ArrayCStyle<T> {
     fn drop(&mut self) {
         self.deallocate();
     }
 }
 
-impl<T> Index<usize> for Array<T> {
+impl<T> Index<usize> for ArrayCStyle<T> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
         self.get(index).expect("Index out of bounds")
     }
 }
 
-impl<T> IndexMut<usize> for Array<T> {
+impl<T> IndexMut<usize> for ArrayCStyle<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         self.get_mut(index).expect("Index out of bounds")
     }
@@ -334,7 +303,7 @@ impl<T> Iterator for ArrayIntoIter<T> {
     }
 }
 
-impl<T> IntoIterator for Array<T> {
+impl<T> IntoIterator for ArrayCStyle<T> {
     type Item = T;
     type IntoIter = ArrayIntoIter<T>;
 
@@ -346,12 +315,12 @@ impl<T> IntoIterator for Array<T> {
     }
 }
 
-impl<T> FromIterator<T> for Array<T> {
+impl<T> FromIterator<T> for ArrayCStyle<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let size_hint = iter.size_hint().0;
 
-        let mut array = Array::new(size_hint).expect(""); //TODO come up with meaningful error message
+        let mut array = ArrayCStyle::new(size_hint).expect(""); //TODO come up with meaningful error message
 
         for (index, item) in iter.enumerate() {
             if index >= size_hint {
@@ -368,9 +337,9 @@ impl<T> FromIterator<T> for Array<T> {
     }
 }
 
-impl<T> From<&[T]> for Array<T> {
+impl<T> From<&[T]> for ArrayCStyle<T> {
     fn from(slice: &[T]) -> Self {
-        let copy_to_array = Array::new(slice.len()).unwrap();
+        let copy_to_array = ArrayCStyle::new(slice.len()).unwrap();
 
         // Manually copy elements from the slice to the allocated memory.
         unsafe {
